@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SITTA – Sistem Informasi Tiras dan Transaksi Bahan Ajar UT</title>
+  <meta name="description" content="Aplikasi pemesanan dan distribusi bahan ajar Universitas Terbuka berbasis Vue.js" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <!-- Global Styles -->
+  <link rel="stylesheet" href="./assets/css/style.css" />
+  <!-- Chart.js & Lucide CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     ROOT APP
+     ════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- Loading Screen -->
+  <div v-if="isLoading" class="loading-screen">
+    <div class="spinner-container">
+      <div class="premium-spinner"></div>
+      <div class="spinner-glow"></div>
+    </div>
+    <p class="loading-text">Memuat Sistem SITTA PRO…</p>
+  </div>
+
+  <!-- Load Error -->
+  <div v-else-if="loadError" class="error-box">
+    <div class="error-icon">⚠️</div>
+    <h3>Gagal Memuat Data</h3>
+    <p class="error-msg">{{ loadError }}</p>
+    <div class="error-action">
+      <p>Jalankan server lokal terlebih dahulu:</p>
+      <code>npx serve .</code>
+      <p class="mt-8">Lalu buka: <a href="http://localhost:5500" target="_blank" class="text-accent">http://localhost:5500</a> atau <a href="http://localhost:3000" target="_blank" class="text-accent">http://localhost:3000</a></p>
+    </div>
+  </div>
+
+  <!-- App Shell -->
+  <div v-else class="app-wrapper">
+
+    <!-- ── Top Bar ──────────────────────────────────── -->
+    <header class="topbar">
+      <div class="topbar-logo">
+        <div class="logo-icon">
+          <i data-lucide="graduation-cap" class="icon-pulse"></i>
+        </div>
+        <div>
+          <div class="brand-name">SITTA UT <span class="badge-tag">PRO</span></div>
+          <span class="brand-sub">Sistem Informasi Tiras &amp; Transaksi Bahan Ajar</span>
+        </div>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="user-profile">
+        <div class="user-avatar">AD</div>
+        <div class="user-info">
+          <span class="user-name">Administrator</span>
+          <span class="user-role">Superintendent UT</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Sidebar Navigation ─────────────────────── -->
+    <nav class="sidebar">
+      <span class="sidebar-label">Menu Utama</span>
+
+      <button
+        id="nav-stok"
+        class="nav-item"
+        v-bind:class="{ active: tab === 'stok' }"
+        v-on:click="setTab('stok')"
+      >
+        <span class="nav-icon"><i data-lucide="package"></i></span>
+        Stok Bahan Ajar
+      </button>
+
+      <button
+        id="nav-tracking"
+        class="nav-item"
+        v-bind:class="{ active: tab === 'tracking' }"
+        v-on:click="setTab('tracking')"
+      >
+        <span class="nav-icon"><i data-lucide="truck"></i></span>
+        Tracking DO
+      </button>
+
+      <button
+        id="nav-order"
+        class="nav-item"
+        v-bind:class="{ active: tab === 'order' }"
+        v-on:click="setTab('order')"
+      >
+        <span class="nav-icon"><i data-lucide="shopping-cart"></i></span>
+        Pemesanan
+      </button>
+
+      <span class="sidebar-label" style="margin-top:auto;">Metrik Cepat</span>
+      <div class="sidebar-metrics">
+        <div class="metric-item">
+          <span class="metric-label">Total Stok</span>
+          <span class="metric-value text-accent">{{ stok.length }} <span class="metric-unit">judul</span></span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Total DO</span>
+          <span class="metric-value text-accent2">{{ tracking.length }} <span class="metric-unit">pesanan</span></span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ── Main Content ───────────────────────────── -->
+    <main class="main-content">
+
+      <!-- TAB: Stok Bahan Ajar -->
+      <ba-stock-table
+        v-show="tab === 'stok'"
+        v-bind:stok="stok"
+        v-bind:upbjj-list="upbjjList"
+        v-bind:kategori-list="kategoriList"
+        v-on:stok-tambah="onStokTambah"
+        v-on:stok-update="onStokUpdate"
+        v-on:stok-hapus="onStokHapus"
+      ></ba-stock-table>
+
+      <!-- TAB: Tracking DO -->
+      <do-tracking
+        v-show="tab === 'tracking'"
+        v-bind:tracking="tracking"
+        v-bind:paket="paket"
+        v-bind:pengiriman-list="pengirimanList"
+        v-on:do-tambah="onDoTambah"
+        v-on:do-progress="onDoProgress"
+      ></do-tracking>
+
+      <!-- TAB: Pemesanan -->
+      <order-form
+        v-show="tab === 'order'"
+        v-bind:paket="paket"
+        v-bind:pengiriman-list="pengirimanList"
+        v-bind:stok="stok"
+        v-on:order-submit="onOrderSubmit"
+      ></order-form>
+
+    </main>
+  </div><!-- /app-wrapper -->
+
+  <!-- ── Toast Notification ─────────────────────────── -->
+  <transition name="slide-up">
+    <div
+      v-if="notif.show"
+      class="notif-toast"
+      v-bind:class="'type-' + notif.type"
+    >
+      <div class="notif-content">
+        <i v-if="notif.type === 'success'" data-lucide="check-circle" class="notif-icon"></i>
+        <i v-else-if="notif.type === 'warning'" data-lucide="alert-triangle" class="notif-icon"></i>
+        <i v-else-if="notif.type === 'danger'" data-lucide="alert-circle" class="notif-icon"></i>
+        <span class="notif-message">{{ notif.message }}</span>
+      </div>
+    </div>
+  </transition>
+
+</div><!-- /#app -->
+
+<!-- ═══════════════════════════════════════════════
+     SCRIPTS
+     ════════════════════════════════════════════════ -->
+<!-- Vue 2 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js"></script>
+<!-- Data Service -->
+<script src="./js/services/api.js"></script>
+<!-- Components (harus sebelum app.js) -->
+<script src="./js/components/status-badge.js"></script>
+<script src="./js/components/app-modal.js"></script>
+<script src="./js/components/stock-table.js"></script>
+<script src="./js/components/do-tracking.js"></script>
+<script src="./js/components/order-form.js"></script>
+<!-- Root App -->
+<script src="./js/app.js"></script>
+
+</body>
+</html>

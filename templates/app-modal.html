@@ -1,0 +1,10 @@
+<div class="modal-overlay" v-if="show" v-on:click.self="onCancel">
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <h2 class="modal-title">{{ title }}</h2>
+    <p class="modal-msg">{{ message }}</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" v-on:click="onCancel">{{ cancelText }}</button>
+      <button class="btn" v-bind:class="confirmClass" v-on:click="onConfirm">{{ confirmText }}</button>
+    </div>
+  </div>
+</div>

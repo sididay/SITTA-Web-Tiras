@@ -1,0 +1,233 @@
+<div id="tab-tracking">
+
+  <!-- Section Header -->
+  <div class="section-header">
+    <div>
+      <h2 class="section-title"><i data-lucide="truck" style="width:28px;height:28px;color:var(--accent);"></i> Pelacakan <span>Delivery Order</span></h2>
+      <p class="section-subtitle">Pantau status distribusi bahan ajar dan kelola riwayat logistik mahasiswa</p>
+    </div>
+    <button id="btn-tambah-do" class="btn btn-primary" v-on:click="showAddDO = !showAddDO">
+      <span v-if="!showAddDO"><i data-lucide="plus-circle"></i> Buat DO Baru</span>
+      <span v-else><i data-lucide="x-circle"></i> Tutup Formulir</span>
+    </button>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <span class="search-icon"><i data-lucide="search"></i></span>
+      <input
+        id="search-do"
+        class="form-input search-input"
+        v-model="searchQuery"
+        placeholder="Cari Nomor DO (misal: DO2025-0001) atau NIM mahasiswa… Tekan Enter / Esc"
+        v-on:keyup="onSearchKeyup"
+      />
+    </div>
+    <button class="btn btn-secondary btn-sm" v-on:click="clearSearch" v-if="searchQuery">
+      <i data-lucide="x"></i> Bersihkan
+    </button>
+  </div>
+
+  <!-- Hasil Pencarian -->
+  <div v-if="searchQuery">
+    <div v-if="searchResult" class="card" style="margin-bottom:20px; border-color:var(--accent); background:rgba(59, 130, 246, 0.04);">
+      <div style="font-size:0.75rem; color:var(--accent); font-weight:700; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px;">
+        <i data-lucide="check-circle-2" style="width:14px;height:14px;"></i> Hasil Pencarian Ditemukan
+      </div>
+      <div class="do-card-header" style="cursor:default; padding:0 0 16px; border-bottom:1px solid var(--border); margin-bottom:16px; grid-template-columns: 1fr auto;">
+        <div>
+          <div class="do-number" style="font-size:1.1rem;">{{ searchResult.noDO }}</div>
+          <div class="do-name" style="font-size:1.15rem;">{{ searchResult.nama }}</div>
+          <div class="do-nim" style="font-size:0.8rem;">NIM: {{ searchResult.nim }}</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="status-pill" v-bind:class="statusClass(searchResult.status)">{{ searchResult.status }}</span>
+          <div class="td-muted mt-8" style="font-weight:600;"><i data-lucide="send" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px;"></i>{{ searchResult.ekspedisi }}</div>
+          <div style="font-size:0.78rem; margin-top:4px; color:var(--text-muted);">Tgl Kirim: {{ searchResult.tanggalKirim | tanggal }}</div>
+          <div class="fw-bold text-accent2" style="margin-top:4px; font-size:0.95rem;">{{ searchResult.total | rupiah }}</div>
+        </div>
+      </div>
+      <div style="font-size:0.85rem; font-weight:700; margin-bottom:10px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+        <i data-lucide="package-open" style="width:16px;height:16px;color:var(--accent);"></i> Detail Paket: {{ getNamaPaket(searchResult.paket) }}
+      </div>
+      <ul class="paket-isi-list" style="margin-bottom:20px;">
+        <li v-for="kode in getPaketIsi(searchResult.paket)" v-bind:key="kode">{{ kode }}</li>
+      </ul>
+      <div style="font-size:0.85rem; font-weight:700; margin-bottom:12px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+        <i data-lucide="map-pin" style="width:16px;height:16px;color:var(--accent2);"></i> Riwayat Logistik
+      </div>
+      <div class="timeline">
+        <div 
+          class="timeline-item" 
+          v-for="(p, idx) in searchResult.perjalanan" 
+          v-bind:key="idx"
+          v-bind:class="{ 
+            'active': idx === searchResult.perjalanan.length - 1 && searchResult.status !== 'Terkirim', 
+            'success': idx === searchResult.perjalanan.length - 1 && searchResult.status === 'Terkirim' 
+          }"
+        >
+          <div class="timeline-waktu">{{ p.waktu }}</div>
+          <div class="timeline-ket">{{ p.keterangan }}</div>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="searchNotFound" class="info-box" style="background:rgba(244, 63, 94, 0.05); border-color:rgba(244, 63, 94, 0.2); color:var(--danger); display:flex; align-items:center; gap:8px;">
+      <i data-lucide="alert-circle" style="width:16px;height:16px;"></i> Tidak ditemukan Delivery Order dengan nomor atau NIM "<strong>{{ searchQuery }}</strong>"
+    </div>
+  </div>
+
+  <!-- Form Tambah DO -->
+  <div class="form-panel" v-show="showAddDO">
+    <div class="form-panel-title"><i data-lucide="file-plus" style="color:var(--accent);width:16px;height:16px;"></i> Buat Delivery Order Baru</div>
+
+    <!-- Auto Nomor DO -->
+    <div class="info-box" style="margin-bottom:18px; background:rgba(59, 130, 246, 0.08); border-color:rgba(59, 130, 246, 0.25);">
+      <i data-lucide="cpu" style="width:14px;height:14px;color:var(--accent);vertical-align:middle;margin-right:6px;"></i> Sistem akan membuat nomor DO otomatis: <strong class="text-accent">{{ nextDONumber }}</strong>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">NIM Mahasiswa *</label>
+        <input id="do-nim" class="form-input" v-model="newDO.nim" placeholder="Masukkan NIM" v-on:keyup="onDOEnter" />
+        <span class="form-error" v-if="doErrors.nim"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> {{ doErrors.nim }}</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nama Mahasiswa *</label>
+        <input id="do-nama" class="form-input" v-model="newDO.nama" placeholder="Nama lengkap mahasiswa" v-on:keyup="onDOEnter" />
+        <span class="form-error" v-if="doErrors.nama"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> {{ doErrors.nama }}</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ekspedisi Kurir *</label>
+        <select id="do-ekspedisi" class="form-select" v-model="newDO.ekspedisi">
+          <option value="">-- Pilih Ekspedisi --</option>
+          <option v-for="(p, idx) in pengirimanList" v-bind:key="idx" v-bind:value="p.nama">
+            {{ p.nama }}
+          </option>
+        </select>
+        <span class="form-error" v-if="doErrors.ekspedisi"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> {{ doErrors.ekspedisi }}</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Paket Bahan Ajar *</label>
+        <select id="do-paket" class="form-select" v-model="newDO.paketKode">
+          <option value="">-- Pilih Paket --</option>
+          <option v-for="p in paket" v-bind:key="p.kode" v-bind:value="p.kode">
+            {{ p.kode }} – {{ p.nama }}
+          </option>
+        </select>
+        <span class="form-error" v-if="doErrors.paketKode"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> {{ doErrors.paketKode }}</span>
+        
+        <!-- Detail isi paket -->
+        <div class="info-box" v-if="selectedPaketDetail" style="margin-top:10px;">
+          <strong>{{ selectedPaketDetail.nama }}</strong> — <span class="text-accent2 fw-bold">{{ selectedPaketDetail.harga | rupiah }}</span><br/>
+          <span style="font-size:0.72rem;color:var(--text-muted);display:block;margin-top:4px;">Isi paket:</span>
+          <ul class="paket-isi-list">
+            <li v-for="kode in selectedPaketDetail.isi" v-bind:key="kode">{{ kode }}</li>
+          </ul>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tanggal Pengiriman *</label>
+        <input id="do-tanggal" class="form-input" type="date" v-model="newDO.tanggalKirim" />
+        <div class="text-muted mt-8" style="font-size:0.75rem;">
+          Format: <strong>{{ newDO.tanggalKirim | tanggal }}</strong>
+        </div>
+        <span class="form-error" v-if="doErrors.tanggalKirim"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> {{ doErrors.tanggalKirim }}</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total Pembayaran</label>
+        <div class="form-input" style="background:rgba(59, 130, 246, 0.08); font-weight:800; color:var(--accent); border-color:var(--accent-light);">
+          {{ formattedTotal }}
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:12px;">
+      <button class="btn btn-secondary btn-sm" v-on:click="cancelAddDO">Batal</button>
+      <button id="btn-simpan-do" class="btn btn-success btn-sm" v-on:click="saveDO"><i data-lucide="plus"></i> Proses &amp; Simpan DO</button>
+    </div>
+  </div>
+
+  <!-- Daftar Semua DO -->
+  <div v-if="!searchQuery">
+    <div v-if="tracking.length === 0" class="info-box" style="text-align:center; padding:40px; background:rgba(255,255,255,0.01);">
+      <div style="font-size:2.5rem; margin-bottom:12px;"><i data-lucide="inbox"></i></div>
+      Belum ada riwayat Delivery Order. Klik tombol "Buat DO Baru" untuk memulai logistik baru.
+    </div>
+
+    <div class="do-grid-list">
+      <div 
+        class="do-card" 
+        v-for="item in allTracking" 
+        v-bind:key="item.noDO"
+        v-bind:class="{ 'expanded': activeDetailDO === item.noDO }"
+      >
+        <div class="do-card-header" v-on:click="toggleDetail(item.noDO)">
+          <div>
+            <div class="do-number">{{ item.noDO }}</div>
+            <div class="do-name">{{ item.nama }}</div>
+            <div class="do-nim">NIM: {{ item.nim }}</div>
+          </div>
+          <div class="do-card-meta">
+            <span class="status-pill" v-bind:class="statusClass(item.status)">{{ item.status }}</span>
+            <div class="td-muted mt-4" style="font-size:0.75rem; font-weight:600;"><i data-lucide="truck" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"></i>{{ item.ekspedisi }}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">{{ item.tanggalKirim | tanggal }}</div>
+          </div>
+          <div class="do-chevron">
+            <i data-lucide="chevron-down"></i>
+          </div>
+        </div>
+
+        <!-- Detail DO (v-show: toggle) -->
+        <div class="do-card-body" v-show="activeDetailDO === item.noDO">
+          <div style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+            <i data-lucide="box" style="width:14px;height:14px;color:var(--accent);"></i> Nama Paket: <strong class="text-accent">{{ getNamaPaket(item.paket) }}</strong>
+          </div>
+          <ul class="paket-isi-list" style="margin-bottom:18px;">
+            <li v-for="kode in getPaketIsi(item.paket)" v-bind:key="kode">{{ kode }}</li>
+          </ul>
+
+          <div style="font-size:0.86rem; font-weight:800; margin-bottom:12px; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+            <i data-lucide="map-pin" style="width:14px;height:14px;color:var(--accent2);"></i> Riwayat Logistik Perjalanan
+          </div>
+          <div class="timeline">
+            <div 
+              class="timeline-item" 
+              v-for="(p, idx) in item.perjalanan" 
+              v-bind:key="idx"
+              v-bind:class="{ 
+                'active': idx === item.perjalanan.length - 1 && item.status !== 'Terkirim', 
+                'success': idx === item.perjalanan.length - 1 && item.status === 'Terkirim' 
+              }"
+            >
+              <div class="timeline-waktu">{{ p.waktu }}</div>
+              <div class="timeline-ket">{{ p.keterangan }}</div>
+            </div>
+          </div>
+
+          <!-- Tambah Progress Status -->
+          <div style="margin-top:20px; padding-top:16px; border-top:1px dashed var(--border);">
+            <div style="font-size:0.82rem; font-weight:800; margin-bottom:8px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+              <i data-lucide="plus-circle" style="width:14px;height:14px;color:var(--success);"></i> Perbarui Status Progress
+            </div>
+            <div style="display:flex; gap:10px; align-items:flex-start;">
+              <div style="flex:1;">
+                <input
+                  class="form-input"
+                  v-bind:id="'progress-' + item.noDO"
+                  v-model="progressInput"
+                  placeholder="Masukkan status perjalanan terbaru... (misal: Kurir sedang mengirim...)"
+                  v-on:keyup="onProgressEnter($event, item.noDO)"
+                />
+                <span class="form-error" v-if="progressError"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> {{ progressError }}</span>
+              </div>
+              <button class="btn btn-primary btn-sm" v-on:click="addProgress(item.noDO)">
+                <i data-lucide="send"></i> Update Status
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
